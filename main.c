@@ -191,11 +191,11 @@ void calculator_i() {
         if (ctype == '+') {
             ibigadd(lsv_len, rsv_len);
         } else if (ctype == '-') {
-            //ibigsub(lsv_len, rsv_len);
+            ibigsub();
         } else if (ctype == '*') {
             ibigmul(lsv_len, rsv_len);
         } else if (ctype == '/') {
-            //ibigdiv(lsv_len, rsv_len);
+            //ibigdiv();
         }
 
         if (unrecoverable_error_occurred) {
@@ -209,6 +209,10 @@ void calculator_i() {
                 continue;
             } else {
                 leading_zero = 0;
+            }
+            if (result[i] < 0) {
+                putchar('-');
+                result[i] *= -1;
             }
             putchar(result[i] + '0');
         }

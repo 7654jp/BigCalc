@@ -36,7 +36,11 @@ void bigfac() {
             // Max length of the result is these two added
             bufsize_prev = bufsize;
             bufsize = rsv_len + resb_len;
-            resize_buffer();
+            if (resize_buffer()) {
+                puts("Buffer expansion FAILED!");
+                unrecoverable_error_occurred = 1;
+                return;
+            }
 
             signed char* re_rsb = calloc(sizeof(signed char), bufsize);
             if (re_rsb == NULL) {
@@ -64,29 +68,6 @@ void bigfac() {
                         puts("Error: No more digits available!");
                         unrecoverable_error_occurred = 1;
                         return;
-                    } else {
-                        // Unconfirmed digit overflow occurred
-                        // Run manual buffer resize and store value
-
-                        bufsize_prev = bufsize;
-                        bufsize += rsv_len;
-                        if (resize_buffer()) {
-                            unrecoverable_error_occurred = 1;
-                            return;
-                        }
-
-                        signed char* re_rsb = calloc(sizeof(signed char), bufsize);
-                        if (re_rsb == NULL) {
-                            unrecoverable_error_occurred = 1;
-                            return;
-                        }
-                        for (size_t idx = 0; idx < bufsize_prev; idx++) {
-                            re_rsb[bufsize - idx - 1] = resbuf[bufsize_prev - idx - 1];
-                        }
-                        free(resbuf);
-                        resbuf = re_rsb;
-                        result[resi] += result[resi + 1] / 10;
-                        result[resi + 1] %= 10;
                     }
                 }
             }
@@ -152,7 +133,11 @@ void bigtrm(size_t numlen) {
 
                     bufsize_prev = bufsize;
                     bufsize++;
-                    resize_buffer();
+                    if (resize_buffer()) {
+                        puts("Buffer expansion FAILED!");
+                        unrecoverable_error_occurred = 1;
+                        return;
+                    }
                     result[resi] += result[i] / 10;
                     result[i] %= 10;
                 } else {
@@ -200,7 +185,11 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
         // Its digit will go up, +1 byte for the Buffer
         bufsize_prev = bufsize;
         bufsize++;
-        resize_buffer();
+        if (resize_buffer()) {
+            puts("Buffer expansion FAILED!");
+            unrecoverable_error_occurred = 1;
+            return;
+        }
     }
     for (size_t i = bufsize; i > 0; i--) {
         size_t resi = i - 1;
@@ -220,7 +209,11 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
 
                 bufsize_prev = bufsize;
                 bufsize++;
-                resize_buffer();
+                if (resize_buffer()) {
+                    puts("Buffer expansion FAILED!");
+                    unrecoverable_error_occurred = 1;
+                    return;
+                }
                 result[resi] += result[resi + 1] / 10;
                 result[resi + 1] %= 10;
             }
@@ -236,9 +229,20 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigsub(size_t buf1_len, size_t buf2_len) {
+void ibigsub() {
+    char was_last_digit_negative = 0;
     for (size_t i = bufsize; i > 0; i--) {
-        // aaa
+        size_t res_i = i - 1;
+
+        if (was_last_digit_negative) {
+            lsv[res_i]--;
+            result[res_i + 1] += 10;
+            was_last_digit_negative = 0;
+        }
+        result[res_i] = lsv[res_i] - rsv[res_i];
+
+        if (result[res_i] < 0)
+            was_last_digit_negative = 1;
     }
 
     result_len = bufsize;
@@ -251,43 +255,42 @@ void ibigsub(size_t buf1_len, size_t buf2_len) {
 }
 
 void ibigmul(size_t buf1_len, size_t buf2_len) {
-    if (bufsize == ENV_SIZE_MAX) {
+    if (buf1_len > ENV_SIZE_MAX - buf2_len) {
         puts("Warning: The result is likely to overflow!");
-    } else if (bufsize == DOUBLE_SIZE_MAX) {
-        puts("Warning: The result might overflow!");
         bufsize_prev = bufsize;
         bufsize = ENV_SIZE_MAX;
-        resize_buffer();
+        if (resize_buffer()) {
+            puts("Buffer expansion FAILED!");
+            unrecoverable_error_occurred = 1;
+            return;
+        }
     } else if (buf1_len + buf2_len > bufsize) {
+        if (bufsize == DOUBLE_SIZE_MAX) {
+            puts("Warning: The result might overflow!");
+        }
         // Max length of the result is these two added
         bufsize_prev = bufsize;
         bufsize = buf1_len + buf2_len;
-        resize_buffer();
+        if (resize_buffer()) {
+            puts("Buffer expansion FAILED!");
+            unrecoverable_error_occurred = 1;
+            return;
+        }
     }
 
-    for (size_t i = bufsize; i > buf1_len; i--) {
-        for (size_t j = bufsize; j > buf2_len; j--) {
+    for (size_t i = bufsize; i > bufsize - buf1_len; i--) {
+        for (size_t j = bufsize; j > bufsize - buf2_len; j--) {
             size_t resi = i + j - bufsize - 1;
             result[resi] += lsv[i - 1] * rsv[j - 1];
             if (result[resi] > 9) {
-                if (j != 1) {
-                    result[resi - 1] += result[resi] / 10;
-                    result[resi] %= 10;
-                } else if (bufsize == ENV_SIZE_MAX) {
+                if (bufsize == ENV_SIZE_MAX) {
                     // Real max
                     puts("Error: No more digits available!");
                     unrecoverable_error_occurred = 1;
                     return;
-                } else {
-                    // Unconfirmed digit overflow occurred
-                    // Run manual buffer resize and store value
-
-                    bufsize_prev = bufsize;
-                    bufsize++;
-                    resize_buffer();
-                    result[resi] += result[resi + 1] / 10;
-                    result[resi + 1] %= 10;
                 }
+                result[resi - 1] += result[resi] / 10;
+                result[resi] %= 10;
             }
         }
     }
@@ -299,4 +302,8 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
             break;
         }
     }
+}
+
+void ibigdiv() {
+
 }
