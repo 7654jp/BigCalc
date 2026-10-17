@@ -37,7 +37,7 @@ void debug_printv(signed char* num, size_t numlen) {
 char unrecoverable_error_occurred = 0;
 
 int main(void) {
-    puts("Big number calculator");
+    puts("Big number calculator v0.1a_11");
     puts("Made by @7654jp\n");
 
     char mode = 'X';
@@ -203,18 +203,29 @@ void calculator_i() {
         }
 
         printf("\n= ");
-        char leading_zero = 1;
+        // Bit 0: zero
+        // Bit 1: sign
+        char leading = 0x03;
         for (size_t i = 0; i < bufsize; i++) {
-            if (result[i] == 0 && leading_zero) {
-                continue;
-            } else {
-                leading_zero = 0;
+            if (leading & 0x01) { // If zero flagged
+                if (result[i] == 0) {
+                    continue;
+                } else {
+                    leading &= 0x02; // Set zero flag to false
+                }
             }
             if (result[i] < 0) {
-                putchar('-');
-                result[i] *= -1;
+                if (leading & 0x02) { // If no-sign flagged
+                    putchar('-');
+                    leading &= 0x01; // Set no-sign flag to false
+                }
+                putchar(-result[i] + '0');
+            } else {
+                putchar(result[i] + '0');
             }
-            putchar(result[i] + '0');
+        }
+        if (leading & 0x01) { // If zero flag is still set
+            putchar('0');
         }
         // Clear lsv/rsv buffer
         for (size_t i = 0; i < bufsize; i++) {
@@ -241,6 +252,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
         return 0;
     }
     size_t input_len = 0;
+    char negative = 0;
     char c;
     while ((c = getchar()) != '\n' && c != EOF)
     {
@@ -276,6 +288,11 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
                 target = rsv;
             }
         }
+        if (input_len == 0) {
+            if (c == '-') {
+                negative = 1;
+            }
+        }
 
         if (c < '0' || c > '9')
             continue;
@@ -284,6 +301,8 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
             target[i] = target[i + 1];
         }
         target[bufsize - 1] = c - '0';
+        if (negative)
+            target[bufsize - 1] *= -1;
         input_len++;
     }
 

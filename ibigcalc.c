@@ -22,6 +22,10 @@ extern char unrecoverable_error_occurred;
 extern const size_t DOUBLE_SIZE_MAX;
 extern const size_t ENV_SIZE_MAX;
 
+signed char sc_abs(signed char v) {
+    return (v < 0) ? -v : v;
+}
+
 void bigfac() {
     signed char* resbuf = calloc(sizeof(signed char), bufsize);
     resbuf[bufsize - 1] = 1;
@@ -176,9 +180,8 @@ void bigtrm(size_t numlen) {
 }
 
 void ibigadd(size_t buf1_len, size_t buf2_len) {
-    int idx_ctrl = bufsize != buf1_len;
-    signed char lsv_top = lsv[bufsize - buf1_len - idx_ctrl];
-    signed char rsv_top = rsv[bufsize - buf2_len - idx_ctrl];
+    signed char lsv_top = lsv[bufsize - buf1_len];
+    signed char rsv_top = rsv[bufsize - buf2_len];
     if (bufsize == ENV_SIZE_MAX) {
         puts("Warning: The result is likely to overflow!");
     } else if (lsv_top + rsv_top >= 10) {
@@ -190,11 +193,28 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
             unrecoverable_error_occurred = 1;
             return;
         }
+    } else if (lsv_top < 0 || rsv_top < 0) {
+        if (lsv_top < 0) {
+            for (size_t i = 0; i < bufsize; i++) {
+                if (lsv[i] < 0)
+                    lsv[i] *= -1;
+            }
+            signed char* rsvp = rsv;
+            rsv = lsv;
+            lsv = rsvp;
+        } else {
+            for (size_t i = 0; i < bufsize; i++) {
+                if (rsv[i] < 0)
+                    rsv[i] *= -1;
+            }
+        }
+        ibigsub();
+        return;
     }
     for (size_t i = bufsize; i > 0; i--) {
         size_t resi = i - 1;
         result[resi] += lsv[resi] + rsv[resi];
-        if (result[resi] > 9) {
+        if (sc_abs(result[resi]) > 9) {
             if (i != 1) {
                 result[resi - 1] += result[resi] / 10;
                 result[resi] %= 10;
@@ -235,14 +255,25 @@ void ibigsub() {
         size_t res_i = i - 1;
 
         if (was_last_digit_negative) {
-            lsv[res_i]--;
-            result[res_i + 1] += 10;
+            while (result[res_i + 1] < 0) {
+                lsv[res_i]--;
+                result[res_i + 1] += 10;
+            }
             was_last_digit_negative = 0;
         }
         result[res_i] = lsv[res_i] - rsv[res_i];
 
-        if (result[res_i] < 0)
-            was_last_digit_negative = 1;
+        if (result[res_i] < 0) {
+            for (size_t i = 0; i < bufsize; i++) {
+                if (i != bufsize - 1 && result[i + 1] > 0) {
+                    result[i]++;
+                    result[i + 1] -= 10;
+                }
+                if (lsv[i] != 0) {
+                    was_last_digit_negative = 1;
+                }
+            }
+        }
     }
 
     result_len = bufsize;
@@ -282,7 +313,8 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
         for (size_t j = bufsize; j > bufsize - buf2_len; j--) {
             size_t resi = i + j - bufsize - 1;
             result[resi] += lsv[i - 1] * rsv[j - 1];
-            if (result[resi] > 9) {
+
+            if (sc_abs(result[resi]) > 9) {
                 if (bufsize == ENV_SIZE_MAX) {
                     // Real max
                     puts("Error: No more digits available!");
