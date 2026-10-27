@@ -37,7 +37,7 @@ void debug_printv(signed char* num, size_t numlen) {
 char unrecoverable_error_occurred = 0;
 
 int main(void) {
-    puts("Big number calculator v0.1a_11");
+    puts("Big number calculator v0.1a_22d3");
     puts("Made by @7654jp\n");
 
     char mode = 'X';
@@ -93,11 +93,12 @@ void calculator_i() {
         if (unrecoverable_error_occurred) {
             break;
         }
-
+        putchar('\n');
         char ctype;
         while (1) {
-            printf("\nCalculation type ('h' to show help): ");
-            ctype = getchar();
+            printf("Calculation type ('h' to show help): ");
+            if ((ctype = getchar()) == '\n')
+                continue;
             flush_newline();
             if (ctype == '+' || ctype == '-' || ctype == '*' || ctype == '/'
                     || ctype == '%' || ctype == '!' || ctype == '?') {
@@ -182,7 +183,6 @@ void calculator_i() {
         if (unrecoverable_error_occurred) {
             break;
         }
-        putchar('\n');
 
         // Clear result buffer
         for (size_t i = 0; i < bufsize; i++)
@@ -191,11 +191,11 @@ void calculator_i() {
         if (ctype == '+') {
             ibigadd(lsv_len, rsv_len);
         } else if (ctype == '-') {
-            ibigsub();
+            ibigsub(lsv_len, rsv_len);
         } else if (ctype == '*') {
             ibigmul(lsv_len, rsv_len);
         } else if (ctype == '/') {
-            //ibigdiv();
+            ibigdiv(lsv_len, rsv_len);
         }
 
         if (unrecoverable_error_occurred) {
@@ -233,7 +233,7 @@ void calculator_i() {
             rsv[i] = 0;
         }
 
-        puts("\n\nYou can type 'A' to use the answer as input instead.");
+        puts("\n\nYou can type 'A' to use this answer as input(s).");
     }
 }
 
@@ -288,10 +288,9 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
                 target = rsv;
             }
         }
-        if (input_len == 0) {
-            if (c == '-') {
-                negative = 1;
-            }
+        if (input_len == 0 && c == '-') {
+            negative = 1;
+            continue;
         }
 
         if (c < '0' || c > '9')

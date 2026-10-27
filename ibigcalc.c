@@ -2,10 +2,12 @@
 #define STDLIB_H_INCLUDED
 #include <stdlib.h>
 #endif
+
 #ifndef STDIO_H_INCLUDED
 #define STDIO_H_INCLUDED
 #include <stdio.h>
 #endif
+
 #include "ibigcalc.h"
 
 // Calculation buffers and related data/function
@@ -22,6 +24,7 @@ extern char unrecoverable_error_occurred;
 extern const size_t DOUBLE_SIZE_MAX;
 extern const size_t ENV_SIZE_MAX;
 
+// Gets absolute value of given `signed char` value.
 signed char sc_abs(signed char v) {
     return (v < 0) ? -v : v;
 }
@@ -202,13 +205,17 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
             signed char* rsvp = rsv;
             rsv = lsv;
             lsv = rsvp;
+
+            size_t buf2l = buf2_len;
+            buf2_len = buf1_len;
+            buf1_len = buf2l;
         } else {
             for (size_t i = 0; i < bufsize; i++) {
                 if (rsv[i] < 0)
                     rsv[i] *= -1;
             }
         }
-        ibigsub();
+        ibigsub(buf1_len, buf2_len);
         return;
     }
     for (size_t i = bufsize; i > 0; i--) {
@@ -249,30 +256,51 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigsub() {
-    char was_last_digit_negative = 0;
-    for (size_t i = bufsize; i > 0; i--) {
-        size_t res_i = i - 1;
+void ibigsub(size_t buf1_len, size_t buf2_len) {
+    char negative = 0;
 
-        if (was_last_digit_negative) {
-            while (result[res_i + 1] < 0) {
-                lsv[res_i]--;
-                result[res_i + 1] += 10;
-            }
-            was_last_digit_negative = 0;
+    size_t begin = buf1_len;
+    if (buf2_len > begin) begin = buf2_len;
+    begin = bufsize - begin;
+
+    for (size_t i = 0; i < bufsize; i++)
+        result[i] = lsv[i];
+
+    // Subtract from above
+    for (size_t i = begin; i < bufsize; i++) {
+        result[i] -= rsv[i];
+
+        if (i == begin) {
+            // Result is negative
+            if (result[i] < 0)
+                negative = 1;
+
+        } else if (negative && result[i] > 0) {
+            // Over-subtraction fixing
+            result[i - 1]++;
+            result[i] -= 10;
+        } else if (!negative && result[i] < 0) {
+            // Over-subtraction fixing 2
+            result[i - 1]--;
+            result[i] += 10;
         }
-        result[res_i] = lsv[res_i] - rsv[res_i];
 
-        if (result[res_i] < 0) {
-            for (size_t i = 0; i < bufsize; i++) {
-                if (i != bufsize - 1 && result[i + 1] > 0) {
-                    result[i]++;
-                    result[i + 1] -= 10;
-                }
-                if (lsv[i] != 0) {
-                    was_last_digit_negative = 1;
-                }
+        if (i != bufsize - 1) {
+            // Down-bringer
+            if (result[i] >= 0) {
+                result[i]--;
+                result[i + 1] += 10;
+            } else {
+                result[i]++;
+                result[i + 1] -= 10;
             }
+        }
+    }
+
+    for (size_t i = bufsize - 1; i > 0; i--) {
+        if (sc_abs(result[i]) > 9) {
+            result[i - 1] += result[i] / 10;
+            result[i] %= 10;
         }
     }
 
@@ -312,7 +340,10 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
     for (size_t i = bufsize; i > bufsize - buf1_len; i--) {
         for (size_t j = bufsize; j > bufsize - buf2_len; j--) {
             size_t resi = i + j - bufsize - 1;
-            result[resi] += lsv[i - 1] * rsv[j - 1];
+            // Run multiplication if meaningful
+            if (lsv[i - 1] != 0 && rsv[j - 1] != 0) {
+                result[resi] += lsv[i - 1] * rsv[j - 1];
+            }
 
             if (sc_abs(result[resi]) > 9) {
                 if (bufsize == ENV_SIZE_MAX) {
@@ -336,6 +367,6 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigdiv() {
+void ibigdiv(size_t buf1_len, size_t buf2_len) {
 
 }

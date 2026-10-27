@@ -10,6 +10,6 @@ void bigtrm(size_t numlen);
 // Two number calculation functions
 
 void ibigadd(size_t buf1_len, size_t buf2_len);
-void ibigsub();
+void ibigsub(size_t buf1_len, size_t buf2_len);
 void ibigmul(size_t buf1_len, size_t buf2_len);
-void ibigdiv();
+void ibigdiv(size_t buf1_len, size_t buf2_len);
