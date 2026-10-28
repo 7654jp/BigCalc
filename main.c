@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #define STDLIB_H_INCLUDED
 #include <string.h>
+
 #include "ibigcalc.h"
 
 void calculator_i(); // Calculation main loop #1
@@ -20,8 +21,9 @@ signed char* result = NULL;
 const size_t DOUBLE_SIZE_MAX = (size_t)1 << (sizeof(size_t)*8-1);
 const size_t ENV_SIZE_MAX = -1;
 
-int resize_buffer();
 size_t read_bigint(signed char* target, char lsv_or_rsv);
+int resize_buffer();
+
 void flush_newline() {
     int c;
     while ((c = getchar()) != '\n' && c != EOF) {};
@@ -37,7 +39,7 @@ void debug_printv(signed char* num, size_t numlen) {
 char unrecoverable_error_occurred = 0;
 
 int main(void) {
-    puts("Big number calculator v0.1a_22d3");
+    puts("Big number calculator v0.1a_23");
     puts("Made by @7654jp\n");
 
     char mode = 'X';
@@ -66,13 +68,13 @@ int main(void) {
 void calculator_i() {
     puts("Prepareing Integer mode...");
 
-    // Left Side Value, converted from `value1`
+    // Left Side Value
     lsv = calloc(sizeof(signed char), bufsize);
     if (lsv == NULL) {
         puts("Error: Initial memory allocation FAILED!");
         return;
     }
-    // Right Side Value, converted from `value2`
+    // Right Side Value
     rsv = calloc(sizeof(signed char), bufsize);
     if (rsv == NULL) {
         puts("Error: Initial memory allocation FAILED!");
@@ -86,6 +88,7 @@ void calculator_i() {
     }
 
     puts("Initial setup completed.");
+    puts("Enter 'q' to quit.");
 
     while (1) {
         printf("\nEnter 1st value (default:0): ");
@@ -124,13 +127,13 @@ void calculator_i() {
             for (size_t i = 0; i < bufsize; i++)
                 result[i] = 0;
 
+            char skip = 0;
             if (ctype == '!') {
                 // '0!' detection
-                char skip = 0;
                 if (lsv[bufsize - 1] == 0 && lsv[bufsize - 2] == 0) {
                     skip = 1;
-                    for (size_t i = bufsize; i > 0; i--) {
-                        if (lsv[i] != 0) {
+                    for (size_t i = bufsize - 2; i > 0; i--) {
+                        if (lsv[i - 1] != 0) {
                             skip = 0;
                             break;
                         }
@@ -143,7 +146,15 @@ void calculator_i() {
                     bigfac();
                 }
             } else {
-                bigtrm(lsv_len);
+                // Check if lsv < 0
+                for (size_t i = bufsize; i > 0; i--) {
+                    if (lsv[i - 1] < 0) {
+                        skip = 1;
+                        break;
+                    }
+                }
+                if (!skip)
+                    bigtrm(lsv_len);
             }
 
             if (unrecoverable_error_occurred) {
@@ -195,7 +206,9 @@ void calculator_i() {
         } else if (ctype == '*') {
             ibigmul(lsv_len, rsv_len);
         } else if (ctype == '/') {
-            ibigdiv(lsv_len, rsv_len);
+            ibigdiv(lsv_len, rsv_len, 0);
+        } else {
+            ibigdiv(lsv_len, rsv_len, 1);
         }
 
         if (unrecoverable_error_occurred) {
@@ -256,6 +269,11 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
     char c;
     while ((c = getchar()) != '\n' && c != EOF)
     {
+        if (c == 'q') {
+            // Well it's not 'unrecoverable', but you know, it's the easy way
+            unrecoverable_error_occurred = 1;
+            return 0;
+        }
         if (c == 'a' || c == 'A') {
             for (size_t i = 0; i < bufsize; i++)
                 target[i] = result[i];

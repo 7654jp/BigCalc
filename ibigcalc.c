@@ -35,8 +35,6 @@ void bigfac() {
     size_t resb_len = 1;
     size_t rsv_len = 1;
     while (1) {
-        printf("RSV length: %lu, ResB length: %lu\n", rsv_len, resb_len);
-        debug_printv(resbuf, bufsize);
         if (bufsize == ENV_SIZE_MAX) {
             puts("Warning: The result is likely to overflow!");
         } else if (rsv_len + resb_len > bufsize) {
@@ -46,6 +44,7 @@ void bigfac() {
             if (resize_buffer()) {
                 puts("Buffer expansion FAILED!");
                 unrecoverable_error_occurred = 1;
+                free(resbuf);
                 return;
             }
 
@@ -62,18 +61,19 @@ void bigfac() {
         }
 
         // Update result
-        for (size_t i = bufsize; i > rsv_len; i--) {
-            for (size_t j = bufsize; j > resb_len; j--) {
+        for (size_t i = bufsize; i > bufsize - rsv_len; i--) {
+            for (size_t j = bufsize; j > bufsize - resb_len; j--) {
                 size_t resi = i + j - bufsize - 1;
                 result[resi] += rsv[i - 1] * resbuf[j - 1];
                 if (result[resi] > 9) {
-                    if (resi != 1) {
+                    if (resi != 0) {
                         result[resi - 1] += result[resi] / 10;
                         result[resi] %= 10;
                     } else if (bufsize == ENV_SIZE_MAX) {
                         // Real max
                         puts("Error: No more digits available!");
                         unrecoverable_error_occurred = 1;
+                        free(resbuf);
                         return;
                     }
                 }
@@ -125,6 +125,7 @@ void bigfac() {
         result_len -= i;
         break;
     }
+    free(resbuf);
 }
 
 void bigtrm(size_t numlen) {
@@ -367,6 +368,103 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigdiv(size_t buf1_len, size_t buf2_len) {
+void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
+    if (rsv[bufsize - 1] == 0 && rsv[bufsize - 2] == 0) {
+        // Div-zero check
+        char divzero = 1;
+        for (size_t i = bufsize; i > 0; i--) {
+            if (rsv[i - 1] != 0) {
+                divzero = 0;
+                break;
+            }
+        }
+        if (divzero) {
+            puts("Error: Divide by zero");
+            return;
+        }
+    }
 
+    size_t begin = bufsize - buf1_len + buf2_len - 1;
+    for (size_t i = begin; i < bufsize; i++) {
+        size_t l_idx = i - buf2_len + 1;
+        // Bring down bigger digit value if available
+        if (l_idx != 0 && lsv[l_idx - 1] != 0) {
+            lsv[l_idx] += lsv[l_idx - 1] * 10;
+            lsv[l_idx - 1] = 0;
+        }
+        // First div-quot assumption
+        div_t fdivres;
+        if (buf1_len >= 2 && buf2_len >= 2) {
+            fdivres = div(lsv[l_idx] * 10 + lsv[l_idx + 1],
+                rsv[bufsize - buf2_len] * 10 + rsv[bufsize - buf2_len + 1]);
+        } else {
+            fdivres = div(lsv[l_idx], rsv[bufsize - buf2_len]);
+        }
+        lsv[l_idx] -= rsv[bufsize - buf2_len] * fdivres.quot;
+        //printf("lsv[%lu] -= %d\n", l_idx, rsv[bufsize - buf2_len] * fdivres.quot);
+
+        if (l_idx != bufsize - 1 && fdivres.quot != 0) {
+            // Try subtracting
+            for (size_t j = buf2_len - 1; j > 0; j--) {
+                size_t s_idx = i - j + 1;
+                signed char l_prev = lsv[s_idx];
+                lsv[s_idx] -= rsv[bufsize - j] * fdivres.quot;
+                //debug_printv(lsv, bufsize);
+                // Sign changed / went to non-zero = subtracted too much
+                if ((l_prev < 0) != (lsv[s_idx] < 0) || (l_prev == 0 && lsv[s_idx] != 0)) {
+                    // Get 10s from the digit above if possible
+                    if (s_idx - 1 > bufsize - buf1_len) {
+                        signed char req;
+                        if (lsv[s_idx] < 0) {
+                            req = (lsv[s_idx] - 9) / 10;
+                            // If subtraction available
+                            if (lsv[s_idx - 1] + req >= 0) {
+                                lsv[s_idx - 1] += req;
+                                lsv[s_idx] -= req * 10;
+                                continue;
+                            }
+                        } else {
+                            req = (lsv[s_idx] + 9) / 10;
+                            //printf("Request made, req = %d, lsv[%lu] = %d\n", req, s_idx, lsv[s_idx]);
+                            // If subtraction available
+                            if (lsv[s_idx - 1] + req <= 0) {
+                                lsv[s_idx - 1] += req;
+                                lsv[s_idx] -= req * 10;
+                                continue;
+                            }
+                        }
+                    }
+                    // Quot assumption failed
+                    fdivres.quot -= (fdivres.quot > 0 ? 1 : -1);
+                    for (size_t backidx = j; backidx <= buf2_len; backidx++) {
+                        size_t back_lidx = i - backidx;
+                        lsv[back_lidx + 1] += rsv[bufsize - backidx];
+                        //printf("Added back %d at lsv[%lu]\n", rsv[bufsize - backidx], back_lidx + 1);
+                        if (sc_abs(lsv[back_lidx + 1]) > 9 && back_lidx != 0) {
+                            lsv[back_lidx] += lsv[back_lidx + 1] / 10;
+                            lsv[back_lidx + 1] %= 10;
+                        }
+                        if (lsv[back_lidx + 1] < 0 && lsv[back_lidx] >= 0) {
+                            lsv[back_lidx]--;
+                            lsv[back_lidx + 1] += 10;
+                        }
+                    }
+                }
+                if (sc_abs(lsv[s_idx]) > 9 && s_idx != bufsize - buf1_len) {
+                    lsv[s_idx + 1] += lsv[s_idx] / 10;
+                    lsv[s_idx] %= 10;
+                }
+            }
+            //debug_printv(lsv, bufsize);
+        }
+        result[i] = fdivres.quot;
+    }
+
+    if (get_reminder) {
+        // Reminder is left in LSV
+        signed char* lsvp = lsv;
+        lsv = result;
+        result = lsvp;
+    }
+    //printf("Reminder: "); debug_printv(lsv, bufsize);
 }
