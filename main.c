@@ -39,23 +39,26 @@ void debug_printv(signed char* num, size_t numlen) {
 char unrecoverable_error_occurred = 0;
 
 int main(void) {
-    puts("Big number calculator v0.1a_23");
+    puts("Big number calculator v0.1a_26");
     puts("Made by @7654jp\n");
 
-    char mode = 'X';
-    while (mode != 'I' && mode != 'F') {
-        puts("Please select Integer mode or Floating-point mode.\n");
-        printf("(I)nteger / (F)loating-point: ");
-        scanf("%c", &mode); flush_newline();
-        if (mode == 'i') mode = 'I';
-        else if (mode == 'f') mode = 'F';
-    }
+    // char mode = 'X';
+    // while (mode != 'I' && mode != 'F') {
+    //     puts("Please select Integer mode or Floating-point mode.\n");
+    //     printf("(I)nteger / (F)loating-point: ");
+    //     scanf("%c", &mode); flush_newline();
+    //     if (mode == 'i') mode = 'I';
+    //     else if (mode == 'f') mode = 'F';
+    // }
 
-    if (mode == 'I') {
-        calculator_i();
-    } else if (mode == 'F') {
-        calculator_f();
-    }
+    // if (mode == 'I') {
+    //     calculator_i();
+    // } else if (mode == 'F') {
+    //     calculator_f();
+    // }
+
+    // Currently only integer mode is available
+    calculator_i();
 
     // Free buffer
     if (lsv != NULL) free(lsv);
@@ -270,7 +273,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
     while ((c = getchar()) != '\n' && c != EOF)
     {
         if (c == 'q') {
-            // Well it's not 'unrecoverable', but you know, it's the easy way
+            // Well it's not 'unrecoverable', but you know, this is the easy way
             unrecoverable_error_occurred = 1;
             return 0;
         }

@@ -401,7 +401,6 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
             fdivres = div(lsv[l_idx], rsv[bufsize - buf2_len]);
         }
         lsv[l_idx] -= rsv[bufsize - buf2_len] * fdivres.quot;
-        //printf("lsv[%lu] -= %d\n", l_idx, rsv[bufsize - buf2_len] * fdivres.quot);
 
         if (l_idx != bufsize - 1 && fdivres.quot != 0) {
             // Try subtracting
@@ -409,44 +408,54 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
                 size_t s_idx = i - j + 1;
                 signed char l_prev = lsv[s_idx];
                 lsv[s_idx] -= rsv[bufsize - j] * fdivres.quot;
-                //debug_printv(lsv, bufsize);
                 // Sign changed / went to non-zero = subtracted too much
                 if ((l_prev < 0) != (lsv[s_idx] < 0) || (l_prev == 0 && lsv[s_idx] != 0)) {
-                    // Get 10s from the digit above if possible
-                    if (s_idx - 1 > bufsize - buf1_len) {
-                        signed char req;
-                        if (lsv[s_idx] < 0) {
-                            req = (lsv[s_idx] - 9) / 10;
-                            // If subtraction available
-                            if (lsv[s_idx - 1] + req >= 0) {
-                                lsv[s_idx - 1] += req;
-                                lsv[s_idx] -= req * 10;
-                                continue;
+                    // Get value from the digit above if possible
+                    if (s_idx - 1 >= bufsize - buf1_len) {
+                        signed char req = (lsv[s_idx] + (lsv[s_idx] < 0 ? -9 : 9)) / 10;
+                        char bring_avail = 1;
+                        size_t bring_idx;
+                        // Find available digit
+                        for (bring_idx = s_idx; bring_idx > 0; bring_idx--) {
+                            if (bring_idx == s_idx) {
+                                if (lsv[bring_idx - 1] > 0 && lsv[bring_idx - 1] + req >= 0)
+                                    break;
+                                else if (lsv[bring_idx - 1] < 0 && lsv[bring_idx - 1] + req <= 0)
+                                    break;
+                            } else if (lsv[bring_idx - 1] != 0) break;
+
+                            if (bring_idx == 1) {
+                                bring_avail = 0;
                             }
-                        } else {
-                            req = (lsv[s_idx] + 9) / 10;
-                            //printf("Request made, req = %d, lsv[%lu] = %d\n", req, s_idx, lsv[s_idx]);
-                            // If subtraction available
-                            if (lsv[s_idx - 1] + req <= 0) {
-                                lsv[s_idx - 1] += req;
-                                lsv[s_idx] -= req * 10;
-                                continue;
+                        }
+                        if (bring_avail) {
+                            bring_idx--;
+                            // Subtract
+                            signed char s = lsv[bring_idx] > 0 ? 1 : -1;
+                            for (size_t bidx = bring_idx; bidx < s_idx; bidx++) {
+                                if (bidx == s_idx - 1) {
+                                    lsv[bidx] += req;
+                                    lsv[bidx + 1] -= req * 10;
+                                } else {
+                                    lsv[bidx] -= s;
+                                    lsv[bidx + 1] += s * 10;
+                                }
                             }
+                            continue;
                         }
                     }
                     // Quot assumption failed
                     fdivres.quot -= (fdivres.quot > 0 ? 1 : -1);
                     for (size_t backidx = j; backidx <= buf2_len; backidx++) {
-                        size_t back_lidx = i - backidx;
-                        lsv[back_lidx + 1] += rsv[bufsize - backidx];
-                        //printf("Added back %d at lsv[%lu]\n", rsv[bufsize - backidx], back_lidx + 1);
-                        if (sc_abs(lsv[back_lidx + 1]) > 9 && back_lidx != 0) {
-                            lsv[back_lidx] += lsv[back_lidx + 1] / 10;
-                            lsv[back_lidx + 1] %= 10;
+                        size_t backidx_l = i - backidx;
+                        lsv[backidx_l + 1] += rsv[bufsize - backidx];
+                        if (sc_abs(lsv[backidx_l + 1]) > 9 && backidx_l != 0) {
+                            lsv[backidx_l] += lsv[backidx_l + 1] / 10;
+                            lsv[backidx_l + 1] %= 10;
                         }
-                        if (lsv[back_lidx + 1] < 0 && lsv[back_lidx] >= 0) {
-                            lsv[back_lidx]--;
-                            lsv[back_lidx + 1] += 10;
+                        if (lsv[backidx_l + 1] < 0 && lsv[backidx_l] >= 0) {
+                            lsv[backidx_l]--;
+                            lsv[backidx_l + 1] += 10;
                         }
                     }
                 }
@@ -455,7 +464,6 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
                     lsv[s_idx] %= 10;
                 }
             }
-            //debug_printv(lsv, bufsize);
         }
         result[i] = fdivres.quot;
     }
@@ -466,5 +474,4 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
         lsv = result;
         result = lsvp;
     }
-    //printf("Reminder: "); debug_printv(lsv, bufsize);
 }
