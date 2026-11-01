@@ -1,24 +1,23 @@
-#ifndef STDLIB_H_INCLUDED
-#define STDLIB_H_INCLUDED
-#include <stdlib.h>
-#endif
-
-#ifndef STDIO_H_INCLUDED
-#define STDIO_H_INCLUDED
 #include <stdio.h>
+
+#ifndef IBIGCALC_H_INCLUDED
+#define IBIGCALC_H_INCLUDED
+#include "ibigcalc.h"
 #endif
 
-#include "ibigcalc.h"
+#ifndef FBIGCALC_H_INCLUDED
+#define FBIGCALC_H_INCLUDED
+#include "fbigcalc.h"
+#endif
 
 // Calculation buffers and related data/function
 extern size_t bufsize_prev;
 extern size_t bufsize;
-extern size_t result_len;
+extern arrayfloat_t result_d;
 extern signed char* lsv;
 extern signed char* rsv;
 extern signed char* result;
 extern int resize_buffer();
-extern void debug_printv(signed char* num, size_t numlen);
 
 extern char unrecoverable_error_occurred;
 extern const size_t DOUBLE_SIZE_MAX;
@@ -119,10 +118,10 @@ void bigfac() {
         }
     }
 
-    result_len = bufsize;
+    result_d.ilength = bufsize;
     for (size_t i = 0; i < bufsize; i++) {
         if (result[i] == 0) continue;
-        result_len -= i;
+        result_d.ilength -= i;
         break;
     }
     free(resbuf);
@@ -174,10 +173,10 @@ void bigtrm(size_t numlen) {
         }
     }
 
-    result_len = bufsize;
+    result_d.ilength = bufsize;
     for (size_t i = 0; i < bufsize; i++) {
         if (result[i] != 0) {
-            result_len -= i;
+            result_d.ilength -= i;
             break;
         }
     }
@@ -188,15 +187,6 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
     signed char rsv_top = rsv[bufsize - buf2_len];
     if (bufsize == ENV_SIZE_MAX) {
         puts("Warning: The result is likely to overflow!");
-    } else if (lsv_top + rsv_top >= 10) {
-        // Its digit will go up, +1 byte for the Buffer
-        bufsize_prev = bufsize;
-        bufsize++;
-        if (resize_buffer()) {
-            puts("Buffer expansion FAILED!");
-            unrecoverable_error_occurred = 1;
-            return;
-        }
     } else if (lsv_top < 0 || rsv_top < 0) {
         if (lsv_top < 0) {
             for (size_t i = 0; i < bufsize; i++) {
@@ -248,10 +238,10 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
         }
     }
 
-    result_len = bufsize;
+    result_d.ilength = bufsize;
     for (size_t i = 0; i < bufsize; i++) {
         if (result[i] != 0) {
-            result_len -= i;
+            result_d.ilength -= i;
             break;
         }
     }
@@ -305,10 +295,10 @@ void ibigsub(size_t buf1_len, size_t buf2_len) {
         }
     }
 
-    result_len = bufsize;
+    result_d.ilength = bufsize;
     for (size_t i = 0; i < bufsize; i++) {
         if (result[i] != 0) {
-            result_len -= i;
+            result_d.ilength -= i;
             break;
         }
     }
@@ -359,10 +349,10 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
         }
     }
 
-    result_len = bufsize;
+    result_d.ilength = bufsize;
     for (size_t i = 0; i < bufsize; i++) {
         if (result[i] != 0) {
-            result_len -= i;
+            result_d.ilength -= i;
             break;
         }
     }

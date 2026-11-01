@@ -1,10 +1,16 @@
 #include <stdio.h>
-#define STDIO_H_INCLUDED
 #include <stdlib.h>
-#define STDLIB_H_INCLUDED
 #include <string.h>
 
+#ifndef IBIGCALC_H_INCLUDED
+#define IBIGCALC_H_INCLUDED
 #include "ibigcalc.h"
+#endif
+
+#ifndef FBIGCALC_H_INCLUDED
+#define FBIGCALC_H_INCLUDED
+#include "fbigcalc.h"
+#endif
 
 void calculator_i(); // Calculation main loop #1
 void calculator_f(); // Calculation main loop #2
@@ -12,8 +18,8 @@ void calculator_f(); // Calculation main loop #2
 // Calculation buffers and related data/function
 
 size_t bufsize_prev;
-size_t bufsize = 4;
-size_t result_len = 0;
+size_t bufsize = 12;
+arrayfloat_t result_d = {0, 0, 0};
 signed char* lsv = NULL;
 signed char* rsv = NULL;
 signed char* result = NULL;
@@ -22,6 +28,7 @@ const size_t DOUBLE_SIZE_MAX = (size_t)1 << (sizeof(size_t)*8-1);
 const size_t ENV_SIZE_MAX = -1;
 
 size_t read_bigint(signed char* target, char lsv_or_rsv);
+arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv);
 int resize_buffer();
 
 void flush_newline() {
@@ -29,36 +36,38 @@ void flush_newline() {
     while ((c = getchar()) != '\n' && c != EOF) {};
 }
 
-void debug_printv(signed char* num, size_t numlen) {
+void debug_fprint(signed char* num, arrayfloat_t numv) {
     printf("Number: ");
-    for (size_t i = 0; i < numlen; i++)
+    for (size_t i = 0; i <= numv.dec_idx; i++)
         printf("%d ", num[i]);
+    if (numv.flength != 0) {
+        putchar('.');
+        for (size_t i = numv.dec_idx + 1; i < bufsize; i++)
+            printf(" %d", num[i]);
+    }
     putchar('\n');
 }
 
 char unrecoverable_error_occurred = 0;
 
 int main(void) {
-    puts("Big number calculator v0.1a_26");
+    puts("Big number calculator v0.1b_1");
     puts("Made by @7654jp\n");
 
-    // char mode = 'X';
-    // while (mode != 'I' && mode != 'F') {
-    //     puts("Please select Integer mode or Floating-point mode.\n");
-    //     printf("(I)nteger / (F)loating-point: ");
-    //     scanf("%c", &mode); flush_newline();
-    //     if (mode == 'i') mode = 'I';
-    //     else if (mode == 'f') mode = 'F';
-    // }
+    char mode = 'X';
+    while (mode != 'I' && mode != 'F') {
+        puts("Please select Integer mode or Floating-point mode.\n");
+        printf("(I)nteger / (F)loating-point: ");
+        scanf("%c", &mode); flush_newline();
+        if (mode == 'i') mode = 'I';
+        else if (mode == 'f') mode = 'F';
+    }
 
-    // if (mode == 'I') {
-    //     calculator_i();
-    // } else if (mode == 'F') {
-    //     calculator_f();
-    // }
-
-    // Currently only integer mode is available
-    calculator_i();
+    if (mode == 'I') {
+        calculator_i();
+    } else if (mode == 'F') {
+        calculator_f();
+    }
 
     // Free buffer
     if (lsv != NULL) free(lsv);
@@ -99,6 +108,7 @@ void calculator_i() {
         if (unrecoverable_error_occurred) {
             break;
         }
+
         putchar('\n');
         char ctype;
         while (1) {
@@ -166,7 +176,7 @@ void calculator_i() {
 
             for (size_t i = 0; i < bufsize; i++) {
                 if (result[i] == 0) continue;
-                result_len = bufsize - i;
+                result_d.ilength = bufsize - i;
                 break;
             }
 
@@ -255,7 +265,121 @@ void calculator_i() {
 
 void calculator_f() {
     puts("Prepareing Floating-point mode...");
-    puts("Not implemented yet.");
+
+    // Left Side Value
+    lsv = calloc(sizeof(signed char), bufsize);
+    if (lsv == NULL) {
+        puts("Error: Initial memory allocation FAILED!");
+        return;
+    }
+    // Right Side Value
+    rsv = calloc(sizeof(signed char), bufsize);
+    if (rsv == NULL) {
+        puts("Error: Initial memory allocation FAILED!");
+        return;
+    }
+    // Stores calculation result
+    result = calloc(sizeof(signed char), bufsize);
+    if (result == NULL) {
+        puts("Error: Initial memory allocation FAILED!");
+        return;
+    }
+
+    puts("Initial setup completed.");
+    puts("Enter 'q' to quit.");
+
+    while (1) {
+        printf("\nEnter 1st value (default:0): ");
+        arrayfloat_t lsv_d = read_bigfloat(lsv, 'l');
+        if (unrecoverable_error_occurred) {
+            break;
+        }
+
+        putchar('\n');
+        char ctype;
+        while (1) {
+            printf("Calculation type ('h' to show help): ");
+            if ((ctype = getchar()) == '\n')
+                continue;
+            flush_newline();
+            if (ctype == '+' || ctype == '-' || ctype == '*' || ctype == '/') {
+                break;
+            } else {
+                if (ctype != 'h' && ctype != 'H') {
+                    puts("Warning: Invalid character.");
+                }
+                puts("+ : Performs addition.");
+                puts("- : Performs subtraction.");
+                puts("* : Performs multiplication.");
+                puts("/ : Performs division. Rounds down to decimal places.");
+            }
+        }
+
+        printf("\nEnter 2nd value(default:0): ");
+        arrayfloat_t rsv_d = read_bigfloat(rsv, 'r');
+        if (unrecoverable_error_occurred) {
+            break;
+        }
+
+        // Clear result buffer
+        for (size_t i = 0; i < bufsize; i++)
+            result[i] = 0;
+
+        if (ctype == '+') {
+            fbigadd(lsv_d, rsv_d);
+        } else if (ctype == '-') {
+            fbigsub(lsv_d, rsv_d);
+        } else if (ctype == '*') {
+            //fbigmul(lsv_d, rsv_d);
+        } else if (ctype == '/') {
+            //fbigdiv(lsv_d, rsv_d);
+        }
+
+        if (unrecoverable_error_occurred) {
+            break;
+        }
+
+        printf("\n= ");
+        // Bit 0: zero
+        // Bit 1: sign
+        char leading = 0x03;
+        for (size_t i = 0; i <= result_d.dec_idx; i++) {
+            if (leading & 0x01) { // If zero flagged
+                if (result[i] == 0) {
+                    continue;
+                } else {
+                    leading &= 0x02; // Set zero flag to false
+                }
+            }
+            if (result[i] < 0) {
+                if (leading & 0x02) { // If no-sign flagged
+                    putchar('-');
+                    leading &= 0x01; // Set no-sign flag to false
+                }
+                putchar(-result[i] + '0');
+            } else {
+                putchar(result[i] + '0');
+            }
+        }
+        if (leading & 0x01)
+            putchar('0');
+        putchar('.');
+        if (result_d.flength != 0) {
+            putchar('.');
+            for (size_t i = result_d.dec_idx + 1; i < bufsize; i++)
+                putchar(result[i] + '0');
+        } else {
+            putchar('0');
+        }
+
+        // Clear lsv/rsv buffer
+        for (size_t i = 0; i < bufsize; i++) {
+            lsv[i] = 0;
+            rsv[i] = 0;
+        }
+
+        puts("\n\nYou can type 'A' to use this answer as input(s).");
+    }
 }
 
 // Reads potencially big integers.
@@ -277,12 +401,20 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
             unrecoverable_error_occurred = 1;
             return 0;
         }
+
         if (c == 'a' || c == 'A') {
             for (size_t i = 0; i < bufsize; i++)
                 target[i] = result[i];
             flush_newline();
-            return result_len;
+            return result_d.ilength;
         }
+        if (input_len == 0 && c == '-') {
+            negative = 1;
+            continue;
+        }
+        if (c < '0' || c > '9')
+            continue;
+
         // If current buffer is full
         if (input_len == bufsize) {
             bufsize_prev = bufsize;
@@ -309,13 +441,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
                 target = rsv;
             }
         }
-        if (input_len == 0 && c == '-') {
-            negative = 1;
-            continue;
-        }
 
-        if (c < '0' || c > '9')
-            continue;
         // Buffer shift
         for (size_t i = 0; i < bufsize; i++) {
             target[i] = target[i + 1];
@@ -327,6 +453,96 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
     }
 
     return input_len;
+}
+
+// Reads potencially big float values.
+// Enter 'l' to write to LSV
+// Enter 'r' to write to RSV
+// Returns the length and the position of the decimal value of the input.
+arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
+    arrayfloat_t value = {0, 0, 0};
+    if (lsv_or_rsv != 'l' && lsv_or_rsv != 'r') {
+        unrecoverable_error_occurred = 1;
+        return value;
+    }
+    size_t input_len = 0;
+    // Bit 0: negative
+    // Bit 1: decimal
+    char flag = 0;
+    char c;
+    while ((c = getchar()) != '\n' && c != EOF) {
+        if (c == 'q') {
+            // Well it's not 'unrecoverable', but you know, this is the easy way
+            unrecoverable_error_occurred = 1;
+            return value;
+        }
+        if (c == 'a' || c == 'A') {
+            for (size_t i = 0; i < bufsize; i++)
+                target[i] = result[i];
+            flush_newline();
+            return result_d;
+        }
+
+        // If decimal point is not set yet
+        if (c == '.' && (flag & 0x02) == 0) {
+            if (input_len == 0)
+                input_len++;
+            value.dec_idx = bufsize - 1;
+            value.ilength = input_len;
+            flag |= 0x02;
+            continue;
+        }
+        if (input_len == 0 && c == '-') {
+            flag |= 0x01;
+            continue;
+        }
+        if (c < '0' || c > '9')
+            continue;
+
+        // If current buffer is full
+        if (input_len == bufsize) {
+            bufsize_prev = bufsize;
+            if (bufsize == DOUBLE_SIZE_MAX) {
+                // No more double
+                bufsize = ENV_SIZE_MAX;
+            } else if (bufsize == ENV_SIZE_MAX) {
+                // Real max
+                puts("Error: No more digits available!");
+                unrecoverable_error_occurred = 1;
+                return value;
+            } else {
+                bufsize *= 2;
+            }
+            // Returns 1 if fails.
+            if (resize_buffer()) {
+                puts("Buffer expansion FAILED!");
+                unrecoverable_error_occurred = 1;
+                return value;
+            }
+            if (lsv_or_rsv == 'l') {
+                target = lsv;
+            } else {
+                target = rsv;
+            }
+        }
+
+        // Buffer shift
+        for (size_t i = 0; i < bufsize - 1; i++) {
+            target[i] = target[i + 1];
+        }
+        target[bufsize - 1] = c - '0';
+        if (flag & 0x01)
+            target[bufsize - 1] *= -1;
+        input_len++;
+        // If decimal point is already set
+        if (flag & 0x02)
+            value.dec_idx--;
+    }
+    value.flength = input_len - value.ilength;
+
+    debug_fprint(target, value);
+    printf("D:%lu I:%lu F:%lu\n", value.dec_idx, value.ilength, value.flength);
+    return value;
 }
 
 int resize_buffer() {

@@ -1,7 +1,4 @@
-#ifndef STDLIB_H_INCLUDED
-#define STDLIB_H_INCLUDED
 #include <stdlib.h>
-#endif
 
 // Calculates factorial, when the value is greater than 0.
 void bigfac();
