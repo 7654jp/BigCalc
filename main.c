@@ -12,6 +12,7 @@
 #include "fbigcalc.h"
 #endif
 
+int initialize_calculator(char mode); // Calculator initialization
 void calculator_i(); // Calculation main loop #1
 void calculator_f(); // Calculation main loop #2
 
@@ -37,21 +38,20 @@ void flush_newline() {
 }
 
 void debug_fprint(signed char* num, arrayfloat_t numv) {
+    printf("D:%lu, I:%lu, F:%lu\n", numv.dec_idx, numv.ilength, numv.flength);
     printf("Number: ");
     for (size_t i = 0; i <= numv.dec_idx; i++)
         printf("%d ", num[i]);
-    if (numv.flength != 0) {
-        putchar('.');
-        for (size_t i = numv.dec_idx + 1; i < bufsize; i++)
-            printf(" %d", num[i]);
-    }
+    putchar('.');
+    for (size_t i = numv.dec_idx + 1; i < bufsize; i++)
+        printf(" %d", num[i]);
     putchar('\n');
 }
 
 char unrecoverable_error_occurred = 0;
 
 int main(void) {
-    puts("Big number calculator v0.1b_1");
+    puts("Big number calculator v0.1b_6");
     puts("Made by @7654jp\n");
 
     char mode = 'X';
@@ -63,10 +63,15 @@ int main(void) {
         else if (mode == 'f') mode = 'F';
     }
 
-    if (mode == 'I') {
-        calculator_i();
-    } else if (mode == 'F') {
-        calculator_f();
+    // Returns 1 if initialization failed
+    if (initialize_calculator(mode)) {
+        puts("This program will free buffer and quit!");
+    } else {
+        if (mode == 'I') {
+            calculator_i();
+        } else if (mode == 'F') {
+            calculator_f();
+        }
     }
 
     // Free buffer
@@ -77,31 +82,37 @@ int main(void) {
     return 0;
 }
 
-void calculator_i() {
-    puts("Prepareing Integer mode...");
+int initialize_calculator(char mode) {
+    if (mode == 'I')
+        puts("Prepareing Integer mode...");
+    else
+        puts("Prepareing Floating-point mode...");
 
     // Left Side Value
     lsv = calloc(sizeof(signed char), bufsize);
     if (lsv == NULL) {
         puts("Error: Initial memory allocation FAILED!");
-        return;
+        return 1;
     }
     // Right Side Value
     rsv = calloc(sizeof(signed char), bufsize);
     if (rsv == NULL) {
         puts("Error: Initial memory allocation FAILED!");
-        return;
+        return 1;
     }
     // Stores calculation result
     result = calloc(sizeof(signed char), bufsize);
     if (result == NULL) {
         puts("Error: Initial memory allocation FAILED!");
-        return;
+        return 1;
     }
 
     puts("Initial setup completed.");
     puts("Enter 'q' to quit.");
+    return 0;
+}
 
+void calculator_i() {
     while (1) {
         printf("\nEnter 1st value (default:0): ");
         size_t lsv_len = read_bigint(lsv, 'l');
@@ -230,8 +241,8 @@ void calculator_i() {
 
         printf("\n= ");
         // Bit 0: zero
-        // Bit 1: sign
-        char leading = 0x03;
+        // Bit 1: negative
+        char leading = 0x01;
         for (size_t i = 0; i < bufsize; i++) {
             if (leading & 0x01) { // If zero flagged
                 if (result[i] == 0) {
@@ -241,14 +252,12 @@ void calculator_i() {
                 }
             }
             if (result[i] < 0) {
-                if (leading & 0x02) { // If no-sign flagged
+                if ((leading & 0x02) == 0) { // If negative flag is false
                     putchar('-');
-                    leading &= 0x01; // Set no-sign flag to false
+                    leading |= 0x02; // Set no-sign flag to false
                 }
-                putchar(-result[i] + '0');
-            } else {
-                putchar(result[i] + '0');
             }
+            putchar(((leading & 0x02) ? -1 : 1) * result[i] + '0');
         }
         if (leading & 0x01) { // If zero flag is still set
             putchar('0');
@@ -264,30 +273,6 @@ void calculator_i() {
 }
 
 void calculator_f() {
-    puts("Prepareing Floating-point mode...");
-
-    // Left Side Value
-    lsv = calloc(sizeof(signed char), bufsize);
-    if (lsv == NULL) {
-        puts("Error: Initial memory allocation FAILED!");
-        return;
-    }
-    // Right Side Value
-    rsv = calloc(sizeof(signed char), bufsize);
-    if (rsv == NULL) {
-        puts("Error: Initial memory allocation FAILED!");
-        return;
-    }
-    // Stores calculation result
-    result = calloc(sizeof(signed char), bufsize);
-    if (result == NULL) {
-        puts("Error: Initial memory allocation FAILED!");
-        return;
-    }
-
-    puts("Initial setup completed.");
-    puts("Enter 'q' to quit.");
-
     while (1) {
         printf("\nEnter 1st value (default:0): ");
         arrayfloat_t lsv_d = read_bigfloat(lsv, 'l');
@@ -341,8 +326,16 @@ void calculator_f() {
 
         printf("\n= ");
         // Bit 0: zero
-        // Bit 1: sign
-        char leading = 0x03;
+        // Bit 1: negative
+        char leading = 0x01;
+        for (size_t i = result_d.dec_idx - result_d.ilength + 1; i < bufsize; i++) {
+            if (result[i] < 0) {
+                leading |= 0x02; // Set negative flag to true
+                putchar('-');
+                break;
+            }
+        }
+
         for (size_t i = 0; i <= result_d.dec_idx; i++) {
             if (leading & 0x01) { // If zero flagged
                 if (result[i] == 0) {
@@ -351,23 +344,14 @@ void calculator_f() {
                     leading &= 0x02; // Set zero flag to false
                 }
             }
-            if (result[i] < 0) {
-                if (leading & 0x02) { // If no-sign flagged
-                    putchar('-');
-                    leading &= 0x01; // Set no-sign flag to false
-                }
-                putchar(-result[i] + '0');
-            } else {
-                putchar(result[i] + '0');
-            }
+            putchar(((leading & 0x02) ? -1 : 1) * result[i] + '0');
         }
         if (leading & 0x01)
             putchar('0');
         putchar('.');
         if (result_d.flength != 0) {
-            putchar('.');
             for (size_t i = result_d.dec_idx + 1; i < bufsize; i++)
-                putchar(result[i] + '0');
+                putchar(((leading & 0x02) ? -1 : 1) * result[i] + '0');
         } else {
             putchar('0');
         }
@@ -397,6 +381,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
     while ((c = getchar()) != '\n' && c != EOF)
     {
         if (c == 'q') {
+            puts("Quitting program...");
             // Well it's not 'unrecoverable', but you know, this is the easy way
             unrecoverable_error_occurred = 1;
             return 0;
@@ -460,7 +445,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
 // Enter 'r' to write to RSV
 // Returns the length and the position of the decimal value of the input.
 arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
-    arrayfloat_t value = {0, 0, 0};
+    arrayfloat_t value = {0, 0, bufsize - 1};
     if (lsv_or_rsv != 'l' && lsv_or_rsv != 'r') {
         unrecoverable_error_occurred = 1;
         return value;
@@ -472,6 +457,7 @@ arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
     char c;
     while ((c = getchar()) != '\n' && c != EOF) {
         if (c == 'q') {
+            puts("Quitting program...");
             // Well it's not 'unrecoverable', but you know, this is the easy way
             unrecoverable_error_occurred = 1;
             return value;
@@ -487,7 +473,6 @@ arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
         if (c == '.' && (flag & 0x02) == 0) {
             if (input_len == 0)
                 input_len++;
-            value.dec_idx = bufsize - 1;
             value.ilength = input_len;
             flag |= 0x02;
             continue;
@@ -534,14 +519,13 @@ arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
         if (flag & 0x01)
             target[bufsize - 1] *= -1;
         input_len++;
-        // If decimal point is already set
-        if (flag & 0x02)
-            value.dec_idx--;
     }
-    value.flength = input_len - value.ilength;
+    if (flag & 0x02)
+        value.flength = input_len - value.ilength;
+    else
+        value.ilength = input_len;
+    value.dec_idx = bufsize - value.flength - 1;
 
-    debug_fprint(target, value);
-    printf("D:%lu I:%lu F:%lu\n", value.dec_idx, value.ilength, value.flength);
     return value;
 }
 

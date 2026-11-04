@@ -182,9 +182,9 @@ void bigtrm(size_t numlen) {
     }
 }
 
-void ibigadd(size_t buf1_len, size_t buf2_len) {
-    signed char lsv_top = lsv[bufsize - buf1_len];
-    signed char rsv_top = rsv[bufsize - buf2_len];
+void ibigadd(size_t lsv_len, size_t rsv_len) {
+    signed char lsv_top = lsv[bufsize - lsv_len];
+    signed char rsv_top = rsv[bufsize - rsv_len];
     if (bufsize == ENV_SIZE_MAX) {
         puts("Warning: The result is likely to overflow!");
     } else if (lsv_top < 0 || rsv_top < 0) {
@@ -197,22 +197,22 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
             rsv = lsv;
             lsv = rsvp;
 
-            size_t buf2l = buf2_len;
-            buf2_len = buf1_len;
-            buf1_len = buf2l;
+            size_t rsvl = rsv_len;
+            rsv_len = lsv_len;
+            lsv_len = rsvl;
         } else {
             for (size_t i = 0; i < bufsize; i++) {
                 if (rsv[i] < 0)
                     rsv[i] *= -1;
             }
         }
-        ibigsub(buf1_len, buf2_len);
+        ibigsub(lsv_len, rsv_len);
         return;
     }
     for (size_t i = bufsize; i > 0; i--) {
         size_t resi = i - 1;
         result[resi] += lsv[resi] + rsv[resi];
-        if (sc_abs(result[resi]) > 9) {
+        if (result[resi] > 9 || result[resi] < -9) {
             if (i != 1) {
                 result[resi - 1] += result[resi] / 10;
                 result[resi] %= 10;
@@ -247,11 +247,11 @@ void ibigadd(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigsub(size_t buf1_len, size_t buf2_len) {
-    char negative = 0;
+void ibigsub(size_t lsv_len, size_t rsv_len) {
+    signed char res_sig;
 
-    size_t begin = buf1_len;
-    if (buf2_len > begin) begin = buf2_len;
+    size_t begin = lsv_len;
+    if (rsv_len > begin) begin = rsv_len;
     begin = bufsize - begin;
 
     for (size_t i = 0; i < bufsize; i++)
@@ -260,36 +260,83 @@ void ibigsub(size_t buf1_len, size_t buf2_len) {
     // Subtract from above
     for (size_t i = begin; i < bufsize; i++) {
         result[i] -= rsv[i];
+        if (i == begin || res_sig == 0) {
+            if (result[i] > 0) res_sig = 1;
+            else if (result[i] == 0) res_sig = 0;
+            else res_sig = -1;
+        } else if (res_sig > 0 && result[i] < 0) {
+            // Non-positive
+            // Search for available digits
 
-        if (i == begin) {
-            // Result is negative
-            if (result[i] < 0)
-                negative = 1;
+            signed char req = (result[i] - 9) / 10;
+            char bring_avail = 0;
+            size_t bring_idx;
+            for (size_t j = i; j > 0; j--) {
+                if ((j == i && result[j - 1] + req >= 0) || (j != i && result[j - 1] > 0)) {
+                    bring_idx = j - 1;
+                    bring_avail = 1;
+                    break;
+                }
+            }
+            if (bring_avail) {
+                for (size_t j = bring_idx; j < i; j++) {
+                    if (j == i - 1) {
+                        result[j] += req;
+                        result[j + 1] -= req * 10;
+                    } else {
+                        result[j]--;
+                        result[j + 1] += 10;
+                    }
+                }
+            }
+        } else if (res_sig < 0 && result[i] > 0) {
+            // Non-negative
+            // Search for available digits
 
-        } else if (negative && result[i] > 0) {
-            // Over-subtraction fixing
-            result[i - 1]++;
-            result[i] -= 10;
-        } else if (!negative && result[i] < 0) {
-            // Over-subtraction fixing 2
-            result[i - 1]--;
-            result[i] += 10;
+            signed char req = (result[i] + 9) / 10;
+            char bring_avail = 0;
+            size_t bring_idx;
+            for (size_t j = i; j > 0; j--) {
+                if ((j == i && result[j - 1] + req <= 0) || (j != i && result[j - 1] < 0)) {
+                    bring_idx = j - 1;
+                    bring_avail = 1;
+                    break;
+                }
+            }
+            if (bring_avail) {
+                for (size_t j = bring_idx; j < i; j++) {
+                    if (j == i - 1) {
+                        result[j] += req;
+                        result[j + 1] -= req * 10;
+                    } else {
+                        result[j]++;
+                        result[j + 1] -= 10;
+                    }
+                }
+            }
         }
 
-        if (i != bufsize - 1) {
-            // Down-bringer
-            if (result[i] >= 0) {
-                result[i]--;
-                result[i + 1] += 10;
-            } else {
-                result[i]++;
-                result[i + 1] -= 10;
+        if (result[i] > 9 || result[i] < -9) {
+            if (i == 0) {
+                bufsize_prev = bufsize;
+                bufsize++;
+                if (resize_buffer()) {
+                    puts("Buffer expansion FAILED!");
+                    unrecoverable_error_occurred = 1;
+                    return;
+                }
+                i++;
+            }
+            for (size_t j = i; j > 0; j--) {
+                if (result[j] < 10 && -10 < result[j]) break;
+                result[j - 1] += result[j] / 10;
+                result[j] %= 10;
             }
         }
     }
 
     for (size_t i = bufsize - 1; i > 0; i--) {
-        if (sc_abs(result[i]) > 9) {
+        if (result[i] > 9 || result[i] < -9) {
             result[i - 1] += result[i] / 10;
             result[i] %= 10;
         }
@@ -304,8 +351,8 @@ void ibigsub(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigmul(size_t buf1_len, size_t buf2_len) {
-    if (buf1_len > ENV_SIZE_MAX - buf2_len) {
+void ibigmul(size_t lsv_len, size_t rsv_len) {
+    if (lsv_len > ENV_SIZE_MAX - rsv_len) {
         puts("Warning: The result is likely to overflow!");
         bufsize_prev = bufsize;
         bufsize = ENV_SIZE_MAX;
@@ -314,13 +361,13 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
             unrecoverable_error_occurred = 1;
             return;
         }
-    } else if (buf1_len + buf2_len > bufsize) {
+    } else if (lsv_len + rsv_len > bufsize) {
         if (bufsize == DOUBLE_SIZE_MAX) {
             puts("Warning: The result might overflow!");
         }
         // Max length of the result is these two added
         bufsize_prev = bufsize;
-        bufsize = buf1_len + buf2_len;
+        bufsize = lsv_len + rsv_len;
         if (resize_buffer()) {
             puts("Buffer expansion FAILED!");
             unrecoverable_error_occurred = 1;
@@ -328,8 +375,8 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
         }
     }
 
-    for (size_t i = bufsize; i > bufsize - buf1_len; i--) {
-        for (size_t j = bufsize; j > bufsize - buf2_len; j--) {
+    for (size_t i = bufsize; i > bufsize - lsv_len; i--) {
+        for (size_t j = bufsize; j > bufsize - rsv_len; j--) {
             size_t resi = i + j - bufsize - 1;
             // Run multiplication if meaningful
             if (lsv[i - 1] != 0 && rsv[j - 1] != 0) {
@@ -358,7 +405,7 @@ void ibigmul(size_t buf1_len, size_t buf2_len) {
     }
 }
 
-void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
+void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
     if (rsv[bufsize - 1] == 0 && rsv[bufsize - 2] == 0) {
         // Div-zero check
         char divzero = 1;
@@ -374,9 +421,9 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
         }
     }
 
-    size_t begin = bufsize - buf1_len + buf2_len - 1;
+    size_t begin = bufsize - lsv_len + rsv_len - 1;
     for (size_t i = begin; i < bufsize; i++) {
-        size_t l_idx = i - buf2_len + 1;
+        size_t l_idx = i - rsv_len + 1;
         // Bring down bigger digit value if available
         if (l_idx != 0 && lsv[l_idx - 1] != 0) {
             lsv[l_idx] += lsv[l_idx - 1] * 10;
@@ -384,24 +431,24 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
         }
         // First div-quot assumption
         div_t fdivres;
-        if (buf1_len >= 2 && buf2_len >= 2) {
+        if (lsv_len >= 2 && rsv_len >= 2) {
             fdivres = div(lsv[l_idx] * 10 + lsv[l_idx + 1],
-                rsv[bufsize - buf2_len] * 10 + rsv[bufsize - buf2_len + 1]);
+                rsv[bufsize - rsv_len] * 10 + rsv[bufsize - rsv_len + 1]);
         } else {
-            fdivres = div(lsv[l_idx], rsv[bufsize - buf2_len]);
+            fdivres = div(lsv[l_idx], rsv[bufsize - rsv_len]);
         }
-        lsv[l_idx] -= rsv[bufsize - buf2_len] * fdivres.quot;
+        lsv[l_idx] -= rsv[bufsize - rsv_len] * fdivres.quot;
 
         if (l_idx != bufsize - 1 && fdivres.quot != 0) {
             // Try subtracting
-            for (size_t j = buf2_len - 1; j > 0; j--) {
+            for (size_t j = rsv_len - 1; j > 0; j--) {
                 size_t s_idx = i - j + 1;
                 signed char l_prev = lsv[s_idx];
                 lsv[s_idx] -= rsv[bufsize - j] * fdivres.quot;
                 // Sign changed / went to non-zero = subtracted too much
                 if ((l_prev < 0) != (lsv[s_idx] < 0) || (l_prev == 0 && lsv[s_idx] != 0)) {
                     // Get value from the digit above if possible
-                    if (s_idx - 1 >= bufsize - buf1_len) {
+                    if (s_idx - 1 >= bufsize - lsv_len) {
                         signed char req = (lsv[s_idx] + (lsv[s_idx] < 0 ? -9 : 9)) / 10;
                         char bring_avail = 1;
                         size_t bring_idx;
@@ -436,7 +483,7 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
                     }
                     // Quot assumption failed
                     fdivres.quot -= (fdivres.quot > 0 ? 1 : -1);
-                    for (size_t backidx = j; backidx <= buf2_len; backidx++) {
+                    for (size_t backidx = j; backidx <= rsv_len; backidx++) {
                         size_t backidx_l = i - backidx;
                         lsv[backidx_l + 1] += rsv[bufsize - backidx];
                         if (sc_abs(lsv[backidx_l + 1]) > 9 && backidx_l != 0) {
@@ -449,7 +496,7 @@ void ibigdiv(size_t buf1_len, size_t buf2_len, char get_reminder) {
                         }
                     }
                 }
-                if (sc_abs(lsv[s_idx]) > 9 && s_idx != bufsize - buf1_len) {
+                if (sc_abs(lsv[s_idx]) > 9 && s_idx != bufsize - lsv_len) {
                     lsv[s_idx + 1] += lsv[s_idx] / 10;
                     lsv[s_idx] %= 10;
                 }
