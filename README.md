@@ -11,24 +11,19 @@ This project was made just for fun. No optimizations are used. Multiplication ta
 
 ## Currently supported calculations
 
-Every mode supports negative numbers.
-
-### Integer mode
+Both modes supports negative numbers.
 
 - Addition
 - Subtraction
 - Multiplication
 - Division
+
+### Integer mode only
+
 - Reminder
 - Factorial
 - Termial
 
-### Floating-point mode
-
-- Addition
-- Subtraction
-
-
 ## Todo
 
-- Implement Floating-point multiplication/division
+- Implement power function (x^n, where `n` is an integer)
