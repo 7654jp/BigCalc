@@ -48,7 +48,7 @@ void sigint_handler(int dummy) {
 }
 
 int main(void) {
-    puts("Big number calculator v0.1b_11");
+    puts("Big number calculator v0.1");
     puts("Made by @7654jp\n");
 
     signal(SIGINT, sigint_handler);
