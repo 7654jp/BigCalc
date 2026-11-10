@@ -518,6 +518,8 @@ void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
         result = lsvp;
     }
 
+    if (scarray_iszero(result)) return;
+
     result_d.ilength = bufsize;
     for (size_t i = 0; i < bufsize; i++) {
         if (result[i] != 0) {

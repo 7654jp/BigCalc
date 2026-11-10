@@ -247,9 +247,7 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
             if (!resd_il) resd_il++;
         }
         // L-shift lsv by 1 to divide further
-        if (lsv[0] == 0 && result_d.ilength + result_d.flength < bufsize - 1) {
-
-        } else {
+        if (lsv[0] != 0 || result_d.ilength + result_d.flength >= bufsize - 1) {
             // Resize buffer
             puts("\nWarning: The result buffer is full!");
             printf("Current buffer size: %lu\n\n", bufsize);
@@ -292,5 +290,4 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
             result_d.flength++;
         if (!resi_locked) resi_locked = 1;
     }
-    printf("Result D:%lu I:%lu F:%lu\n", result_d.dec_idx, result_d.ilength, result_d.flength);
 }
