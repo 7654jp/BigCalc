@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 #ifndef IBIGCALC_H_INCLUDED
 #define IBIGCALC_H_INCLUDED
@@ -28,31 +29,29 @@ signed char* result = NULL;
 const size_t DOUBLE_SIZE_MAX = (size_t)1 << (sizeof(size_t)*8-1);
 const size_t ENV_SIZE_MAX = -1;
 
+extern signed char scarray_iszero(signed char* value);
 size_t read_bigint(signed char* target, char lsv_or_rsv);
 arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv);
 int resize_buffer();
-
-void flush_newline() {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF) {};
-}
-
-void debug_fprint(signed char* num, arrayfloat_t numv) {
-    printf("D:%lu, I:%lu, F:%lu\n", numv.dec_idx, numv.ilength, numv.flength);
-    printf("Number: ");
-    for (size_t i = 0; i <= numv.dec_idx; i++)
-        printf("%d ", num[i]);
-    putchar('.');
-    for (size_t i = numv.dec_idx + 1; i < bufsize; i++)
-        printf(" %d", num[i]);
-    putchar('\n');
-}
+void flush_newline();
 
 char unrecoverable_error_occurred = 0;
 
+void sigint_handler(int dummy) {
+    puts("\nCtrl+C detected, freeing buffer...");
+    // Free buffer
+    if (lsv != NULL) free(lsv);
+    if (rsv != NULL) free(rsv);
+    if (result != NULL) free(result);
+    puts("Quitting...");
+    exit(0);
+}
+
 int main(void) {
-    puts("Big number calculator v0.1b_6");
+    puts("Big number calculator v0.1b_11");
     puts("Made by @7654jp\n");
+
+    signal(SIGINT, sigint_handler);
 
     char mode = 'X';
     while (mode != 'I' && mode != 'F') {
@@ -154,14 +153,7 @@ void calculator_i() {
             char skip = 0;
             if (ctype == '!') {
                 // '0!' detection
-                if (lsv[bufsize - 1] == 0 && lsv[bufsize - 2] == 0) {
-                    skip = 1;
-                    for (size_t i = bufsize - 2; i > 0; i--) {
-                        if (lsv[i - 1] != 0) {
-                            skip = 0;
-                            break;
-                        }
-                    }
+                if ((skip = scarray_iszero(lsv))) {
                     result[bufsize - 1] = 1;
                 }
 
@@ -296,7 +288,7 @@ void calculator_f() {
                 puts("+ : Performs addition.");
                 puts("- : Performs subtraction.");
                 puts("* : Performs multiplication.");
-                puts("/ : Performs division. Rounds down to decimal places.");
+                puts("/ : Performs division.");
             }
         }
 
@@ -306,18 +298,21 @@ void calculator_f() {
             break;
         }
 
-        // Clear result buffer
+        // Clear result buffer & data
         for (size_t i = 0; i < bufsize; i++)
             result[i] = 0;
+        result_d.dec_idx = 0;
+        result_d.ilength = 0;
+        result_d.flength = 0;
 
         if (ctype == '+') {
             fbigadd(lsv_d, rsv_d);
         } else if (ctype == '-') {
             fbigsub(lsv_d, rsv_d);
         } else if (ctype == '*') {
-            //fbigmul(lsv_d, rsv_d);
+            fbigmul(lsv_d, rsv_d);
         } else if (ctype == '/') {
-            //fbigdiv(lsv_d, rsv_d);
+            fbigdiv(lsv_d, rsv_d);
         }
 
         if (unrecoverable_error_occurred) {
@@ -366,9 +361,15 @@ void calculator_f() {
     }
 }
 
+
+void flush_newline() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) {};
+}
+
 // Reads potencially big integers.
-// Enter 'l' to write to LSV
-// Enter 'r' to write to RSV
+// Enter 'l' to write to LSV.
+// Enter 'r' to write to RSV.
 // Returns the length of the input.
 size_t read_bigint(signed char* target, char lsv_or_rsv) {
     if (lsv_or_rsv != 'l' && lsv_or_rsv != 'r') {
@@ -381,7 +382,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
     while ((c = getchar()) != '\n' && c != EOF)
     {
         if (c == 'q') {
-            puts("Quitting program...");
+            puts("Quitting...");
             // Well it's not 'unrecoverable', but you know, this is the easy way
             unrecoverable_error_occurred = 1;
             return 0;
@@ -441,8 +442,8 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
 }
 
 // Reads potencially big float values.
-// Enter 'l' to write to LSV
-// Enter 'r' to write to RSV
+// Enter 'l' to write to LSV.
+// Enter 'r' to write to RSV.
 // Returns the length and the position of the decimal value of the input.
 arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
     arrayfloat_t value = {0, 0, bufsize - 1};
@@ -457,7 +458,7 @@ arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
     char c;
     while ((c = getchar()) != '\n' && c != EOF) {
         if (c == 'q') {
-            puts("Quitting program...");
+            puts("Quitting...");
             // Well it's not 'unrecoverable', but you know, this is the easy way
             unrecoverable_error_occurred = 1;
             return value;
@@ -520,9 +521,7 @@ arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
             target[bufsize - 1] *= -1;
         input_len++;
     }
-    if (flag & 0x02)
-        value.flength = input_len - value.ilength;
-    else
+    if ((flag & 0x02) == 0)
         value.ilength = input_len;
     value.dec_idx = bufsize - value.flength - 1;
 

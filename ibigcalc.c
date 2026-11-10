@@ -28,6 +28,22 @@ signed char sc_abs(signed char v) {
     return (v < 0) ? -v : v;
 }
 
+signed char scarray_iszero(signed char* value) {
+    signed char empty = 0;
+    if (value[bufsize - 1] == 0 && value[bufsize - 2] == 0) {
+        empty = 1;
+        for (size_t i = bufsize - 2; i > 0; i--) {
+            if (value[i - 1] != 0) {
+                empty = 0;
+                break;
+            }
+        }
+        return empty;
+    } else {
+        return 0;
+    }
+}
+
 void bigfac() {
     signed char* resbuf = calloc(sizeof(signed char), bufsize);
     resbuf[bufsize - 1] = 1;
@@ -406,19 +422,9 @@ void ibigmul(size_t lsv_len, size_t rsv_len) {
 }
 
 void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
-    if (rsv[bufsize - 1] == 0 && rsv[bufsize - 2] == 0) {
-        // Div-zero check
-        char divzero = 1;
-        for (size_t i = bufsize; i > 0; i--) {
-            if (rsv[i - 1] != 0) {
-                divzero = 0;
-                break;
-            }
-        }
-        if (divzero) {
-            puts("Error: Divide by zero");
-            return;
-        }
+    if (scarray_iszero(rsv)) {
+        puts("Error: Divide by zero");
+        return;
     }
 
     size_t begin = bufsize - lsv_len + rsv_len - 1;
@@ -502,7 +508,7 @@ void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
                 }
             }
         }
-        result[i] = fdivres.quot;
+        result[i] += fdivres.quot;
     }
 
     if (get_reminder) {
@@ -510,5 +516,13 @@ void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
         signed char* lsvp = lsv;
         lsv = result;
         result = lsvp;
+    }
+
+    result_d.ilength = bufsize;
+    for (size_t i = 0; i < bufsize; i++) {
+        if (result[i] != 0) {
+            result_d.ilength -= i;
+            break;
+        }
     }
 }

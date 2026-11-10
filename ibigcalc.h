@@ -1,5 +1,9 @@
 #include <stdlib.h>
 
+// Checks if the given signed char array is all 0.
+// The length of the array must be equal to `bufsize`.
+signed char scarray_iszero(signed char* value);
+
 // Calculates factorial, when the value is greater than 0.
 void bigfac();
 // Calculates termial, when the value is greater than 0.
