@@ -98,8 +98,10 @@ void bigfac() {
         // Quit if rsv == lsv
         char quit = 1;
         for (size_t i = 0; i < bufsize; i++) {
-            if (lsv[i] != rsv[i])
+            if (lsv[i] != rsv[i]) {
                 quit = 0;
+                break;
+            }
         }
         if (quit) break;
 
@@ -111,11 +113,13 @@ void bigfac() {
 
         // Increment value and update rsv and its length
         rsv[bufsize - 1]++;
-        for (size_t i = bufsize; i > 0; i--) {
+        for (size_t i = bufsize; i > 1; i--) {
             // Result should grow faster, no buffer size check here
+            // Edit: Since rsv is incrementing, this should work when rsv[i - 1] == 10
+            //       Changed to simpler implementation.
             if (rsv[i - 1] > 9) {
-                rsv[i - 2] += rsv[i - 1] / 10;
-                rsv[i - 1] %= 10;
+                rsv[i - 2]++;
+                rsv[i - 1] -= 10;
             }
         }
         rsv_len = bufsize;
@@ -180,7 +184,7 @@ void bigtrm(size_t numlen) {
 
         // Increment value and update rsv
         rsv[bufsize - 1]++;
-        for (size_t i = bufsize; i > 0; i--) {
+        for (size_t i = bufsize; i > 1; i--) {
             // Result should grow faster, no buffer size check here
             if (rsv[i - 1] > 9) {
                 rsv[i - 2] += rsv[i - 1] / 10;
@@ -527,4 +531,117 @@ void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
             break;
         }
     }
+}
+
+void ibigpwr(size_t lsv_len, size_t rsv_len) {
+    // Quit if rsv == 0
+    if (scarray_iszero(rsv)) {
+        if (scarray_iszero(lsv)) {
+            puts("Error: Cannot calculate 0^0.");
+        } else {
+            result[bufsize - 1] = 1;
+        }
+        return;
+    }
+
+    signed char* resbuf = calloc(sizeof(signed char), bufsize);
+    resbuf[bufsize - 1] = 1;
+    size_t resb_len = 1;
+    while (1) {
+        // Decrement value and update rsv and its length
+        rsv[bufsize - 1]--;
+        for (size_t i = bufsize; i > 1; i--) {
+            // Result should grow faster, no buffer size check here
+            if (rsv[i - 1] < 0) {
+                rsv[i - 2]--;
+                rsv[i - 1] += 10;
+            }
+        }
+        rsv_len = bufsize;
+        for (size_t i = 0; i < bufsize; i++) {
+            if (rsv[i] == 0) continue;
+            rsv_len -= i;
+            break;
+        }
+
+        if (bufsize == ENV_SIZE_MAX) {
+            puts("Warning: The result is likely to overflow!");
+        } else if (lsv_len + resb_len > bufsize) {
+            // Power grows very fast, double buffer instead
+            if (bufsize == DOUBLE_SIZE_MAX) {
+                // No more double
+                bufsize_prev = bufsize;
+                bufsize = ENV_SIZE_MAX;
+            } else if (bufsize == ENV_SIZE_MAX) {
+                // Real max
+                puts("Error: No more digits available!");
+                break;
+            } else {
+                bufsize_prev = bufsize;
+                bufsize *= 2;
+            }
+            if (resize_buffer()) {
+                puts("Buffer expansion FAILED!");
+                unrecoverable_error_occurred = 1;
+                free(resbuf);
+                return;
+            }
+
+            signed char* re_rsb = calloc(sizeof(signed char), bufsize);
+            if (re_rsb == NULL) {
+                unrecoverable_error_occurred = 1;
+                return;
+            }
+            for (size_t idx = 0; idx < bufsize_prev; idx++) {
+                re_rsb[bufsize - idx - 1] = resbuf[bufsize_prev - idx - 1];
+            }
+            free(resbuf);
+            resbuf = re_rsb;
+        }
+
+        // Update result
+        for (size_t i = bufsize; i > bufsize - lsv_len; i--) {
+            for (size_t j = bufsize; j > bufsize - resb_len; j--) {
+                size_t resi = i + j - bufsize - 1;
+                result[resi] += lsv[i - 1] * resbuf[j - 1];
+                if (result[resi] > 9) {
+                    if (resi != 0) {
+                        result[resi - 1] += result[resi] / 10;
+                        result[resi] %= 10;
+                    } else if (bufsize == ENV_SIZE_MAX) {
+                        // Real max
+                        puts("Error: No more digits available!");
+                        unrecoverable_error_occurred = 1;
+                        free(resbuf);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Quit if rsv == 0
+        if (scarray_iszero(rsv)) break;
+
+        // Copy to resbuf and clear result
+        for (size_t i = 0; i < bufsize; i++) {
+            resbuf[i] = result[i];
+            result[i] = 0;
+        }
+
+        // Update resbuf length
+        resb_len = bufsize;
+        for (size_t i = 0; i < bufsize; i++) {
+            if (resbuf[i] == 0) continue;
+            resb_len -= i;
+            break;
+        }
+    }
+
+    result_d.ilength = bufsize;
+    for (size_t i = 0; i < bufsize; i++) {
+        if (result[i] == 0) continue;
+        result_d.ilength -= i;
+        break;
+    }
+    free(resbuf);
 }

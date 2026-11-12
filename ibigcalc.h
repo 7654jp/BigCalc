@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 // Checks if the given signed char array is all 0.
+// Returns 1 if true.
 // The length of the array must be equal to `bufsize`.
 signed char scarray_iszero(signed char* value);
 
@@ -13,3 +14,4 @@ void ibigadd(size_t lsv_len, size_t rsv_len);
 void ibigsub(size_t lsv_len, size_t rsv_len);
 void ibigmul(size_t lsv_len, size_t rsv_len);
 void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder);
+void ibigpwr(size_t lsv_len, size_t rsv_len);

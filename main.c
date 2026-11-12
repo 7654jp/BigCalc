@@ -48,7 +48,7 @@ void sigint_handler(int dummy) {
 }
 
 int main(void) {
-    puts("Big number calculator v0.1");
+    puts("Big number calculator v0.2");
     puts("Made by @7654jp\n");
 
     signal(SIGINT, sigint_handler);
@@ -68,7 +68,7 @@ int main(void) {
     } else {
         if (mode == 'I') {
             calculator_i();
-        } else if (mode == 'F') {
+        } else {
             calculator_f();
         }
     }
@@ -127,7 +127,7 @@ void calculator_i() {
                 continue;
             flush_newline();
             if (ctype == '+' || ctype == '-' || ctype == '*' || ctype == '/'
-                    || ctype == '%' || ctype == '!' || ctype == '?') {
+                    || ctype == '^' || ctype == '%' || ctype == '!' || ctype == '?') {
                 break;
             } else {
                 if (ctype != 'h' && ctype != 'H') {
@@ -138,6 +138,7 @@ void calculator_i() {
                 puts("* : Performs multiplication.");
                 puts("/ : Performs division. Rounds down to decimal places.");
                 puts("    Use Floating-point mode to do normal division instead.");
+                puts("^ : Performs power. E.g. 2^3 = 2*2*2 = 8");
                 puts("% : Gets reminder of division.");
                 puts("! : Performs factorial. E.g. 4! = 4*3*2*1 = 24");
                 puts("? : Performs termial. E.g. 4? = 4+3+2+1 = 10");
@@ -223,8 +224,20 @@ void calculator_i() {
             ibigmul(lsv_len, rsv_len);
         } else if (ctype == '/') {
             ibigdiv(lsv_len, rsv_len, 0);
-        } else {
+        } else if (ctype == '%') {
             ibigdiv(lsv_len, rsv_len, 1);
+        } else if (ctype == '^') {
+            // a^(-n) detection
+            // It's always below 1, so no calculation required
+            char negative = 0;
+            for (size_t i = bufsize; i > 0; i--) {
+                if (rsv[i - 1] < 0) {
+                    negative = 1;
+                    break;
+                }
+            }
+            if (!negative)
+                ibigpwr(lsv_len, rsv_len);
         }
 
         if (unrecoverable_error_occurred) {
@@ -429,7 +442,7 @@ size_t read_bigint(signed char* target, char lsv_or_rsv) {
         }
 
         // Buffer shift
-        for (size_t i = 0; i < bufsize; i++) {
+        for (size_t i = 0; i < bufsize - 1; i++) {
             target[i] = target[i + 1];
         }
         target[bufsize - 1] = c - '0';
