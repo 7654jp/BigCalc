@@ -169,6 +169,11 @@ void fbigmul(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
 }
 
 void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
+    if (scarray_iszero(rsv)) {
+        puts("Error: Divide by zero");
+        return;
+    }
+    //TODO: result_d.dec_idx should be valid-digit
     if (lsv_d.dec_idx < rsv_d.dec_idx) {
         size_t mv2 = rsv_d.dec_idx - lsv_d.dec_idx;
         if (rsv_d.dec_idx + 1 - rsv_d.ilength < mv2) {
@@ -192,7 +197,6 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
             rsv[i] = 0;
         rsv_d.dec_idx -= mv2;
         rsv_d.flength += mv2;
-        result_d.dec_idx = rsv_d.dec_idx;
     } else if (lsv_d.dec_idx > rsv_d.dec_idx) {
         size_t mv1 = lsv_d.dec_idx - rsv_d.dec_idx;
         if (lsv_d.dec_idx + 1 - lsv_d.ilength < mv1) {
@@ -216,13 +220,33 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
             lsv[i] = 0;
         lsv_d.dec_idx -= mv1;
         lsv_d.flength += mv1;
-        result_d.dec_idx = lsv_d.dec_idx;
-    } else {
-        result_d.dec_idx = lsv_d.dec_idx;
+    }
+    for (size_t i = 0; i < bufsize; i++) {
+        if (lsv[i] && result_d.dec_idx == 0) {
+            result_d.dec_idx = 1;
+            continue;
+        } else if (rsv[i] && result_d.dec_idx == 0) {
+            result_d.dec_idx = 2;
+            continue;
+        } else if ((lsv[i] && result_d.dec_idx == 2) || (rsv[i] && result_d.dec_idx == 1)) {
+            result_d.dec_idx = i;
+            break;
+        }
     }
     char resi_locked = 0;
     size_t resd_il;
     while (!scarray_iszero(lsv)) {
+        // Shift result buffer
+        for (size_t i = 0; i < bufsize - 1; i++)
+            result[i] = result[i + 1];
+        result[bufsize - 1] = 0;
+        if (resi_locked) {
+            // Shift lsv buffer
+            for (size_t i = 0; i < bufsize - 1; i++)
+                lsv[i] = lsv[i + 1];
+            lsv[bufsize - 1] = 0;
+        }
+
         // Determine actual requires-division digits
         size_t lsv_len = bufsize;
         for (size_t i = 0; i < bufsize; i++) {
@@ -252,8 +276,10 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
             puts("\nWarning: The result buffer is full!");
             printf("Current buffer size: %lu\n\n", bufsize);
             printf("Do you want to expand buffer and continue? [y/N]: ");
-            char c;
-            scanf("%c", &c); flush_newline();
+            char c = getchar();
+            if (c != '\n')
+                flush_newline();
+
             if (c == 'y' || c == 'Y') {
                 if (bufsize == DOUBLE_SIZE_MAX) {
                     // No more double
@@ -278,16 +304,14 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
                 break;
             }
         }
-        for (size_t i = 0; i < bufsize - 1; i++) {
-            lsv[i] = lsv[i + 1];
-            result[i] = result[i + 1];
-        }
-        lsv[bufsize - 1] = 0;
-        result[bufsize - 1] = 0;
-
-        result_d.dec_idx--;
-        if (resi_locked)
+        if (resi_locked) {
+            result_d.dec_idx--;
             result_d.flength++;
+        }
         if (!resi_locked) resi_locked = 1;
     }
+    // Shift lsv buffer back
+    for (size_t i = bufsize; i > 1; i--)
+        lsv[i - 1] = lsv[i - 2];
+    lsv[0] = 0;
 }

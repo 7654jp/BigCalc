@@ -48,7 +48,7 @@ void sigint_handler(int dummy) {
 }
 
 int main(void) {
-    puts("Big number calculator v0.2");
+    puts("Big number calculator v0.2_1");
     puts("Made by @7654jp\n");
 
     signal(SIGINT, sigint_handler);
@@ -344,7 +344,7 @@ void calculator_f() {
             }
         }
 
-        for (size_t i = 0; i <= result_d.dec_idx; i++) {
+        for (size_t i = result_d.dec_idx - result_d.ilength; i <= result_d.dec_idx; i++) {
             if (leading & 0x01) { // If zero flagged
                 if (result[i] == 0) {
                     continue;
@@ -536,6 +536,7 @@ arrayfloat_t read_bigfloat(signed char* target, char lsv_or_rsv) {
     }
     if ((flag & 0x02) == 0)
         value.ilength = input_len;
+    value.flength = input_len - value.ilength;
     value.dec_idx = bufsize - value.flength - 1;
 
     return value;
