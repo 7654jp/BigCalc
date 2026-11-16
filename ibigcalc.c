@@ -531,6 +531,67 @@ void ibigdiv(size_t lsv_len, size_t rsv_len, char get_reminder) {
             break;
         }
     }
+
+    // Re-clean LSV, just in case
+    for (size_t i = bufsize; i > 1; i--) {
+        if (lsv[i - 1] > 9) {
+            lsv[i - 1] -= 10;
+            lsv[i - 2]++;
+            if (i != 2) {
+                for (size_t j = i - 2; j > 0; j--) {
+                    if (lsv[j] > 9) {
+                        lsv[j] -= 10;
+                        lsv[j - 1]++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } else if (lsv[i - 1] < -9) {
+            lsv[i - 1] += 10;
+            lsv[i - 2]--;
+            if (i != 2) {
+                for (size_t j = i - 2; j > 0; j--) {
+                    if (lsv[j] < -9) {
+                        lsv[j] += 10;
+                        lsv[j - 1]--;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    // Result, as well
+    for (size_t i = bufsize; i > 1; i--) {
+        if (result[i - 1] > 9) {
+            result[i - 1] -= 10;
+            result[i - 2]++;
+            if (i != 2) {
+                for (size_t j = i - 2; j > 0; j--) {
+                    if (result[j] > 9) {
+                        result[j] -= 10;
+                        result[j - 1]++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } else if (result[i - 1] < -9) {
+            result[i - 1] += 10;
+            result[i - 2]--;
+            if (i != 2) {
+                for (size_t j = i - 2; j > 0; j--) {
+                    if (result[j] < -9) {
+                        result[j] += 10;
+                        result[j - 1]--;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void ibigpwr(size_t lsv_len, size_t rsv_len) {

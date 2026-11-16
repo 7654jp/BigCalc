@@ -173,7 +173,7 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
         puts("Error: Divide by zero");
         return;
     }
-    //TODO: result_d.dec_idx should be valid-digit
+
     if (lsv_d.dec_idx < rsv_d.dec_idx) {
         size_t mv2 = rsv_d.dec_idx - lsv_d.dec_idx;
         if (rsv_d.dec_idx + 1 - rsv_d.ilength < mv2) {
@@ -221,17 +221,19 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
         lsv_d.dec_idx -= mv1;
         lsv_d.flength += mv1;
     }
-    char dec_sel = 0;
-    for (size_t i = 0; i < bufsize; i++) {
-        if (lsv[i] && dec_sel == 0) {
-            dec_sel = 1;
-            continue;
-        } else if (rsv[i] && dec_sel == 0) {
+    char dec_sel = 1;
+    for (size_t i = bufsize - 1; i > 0; i--) {
+        if (lsv[i] && !rsv[i] && dec_sel == 0) {
             dec_sel = 2;
             continue;
-        } else if ((lsv[i] && dec_sel == 2) || (rsv[i] && dec_sel == 1)) {
-            dec_sel = 0;
-            result_d.dec_idx = i;
+        } else if (!lsv[i] && rsv[i] && dec_sel == 0) {
+            dec_sel = 2;
+            continue;
+        } else if (lsv[i] && rsv[i]) {
+            if (dec_sel == 2) {
+                dec_sel = 0;
+                result_d.dec_idx = i;
+            }
             break;
         }
     }
