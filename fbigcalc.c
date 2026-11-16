@@ -221,17 +221,22 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
         lsv_d.dec_idx -= mv1;
         lsv_d.flength += mv1;
     }
+    char dec_sel = 0;
     for (size_t i = 0; i < bufsize; i++) {
-        if (lsv[i] && result_d.dec_idx == 0) {
-            result_d.dec_idx = 1;
+        if (lsv[i] && dec_sel == 0) {
+            dec_sel = 1;
             continue;
-        } else if (rsv[i] && result_d.dec_idx == 0) {
-            result_d.dec_idx = 2;
+        } else if (rsv[i] && dec_sel == 0) {
+            dec_sel = 2;
             continue;
-        } else if ((lsv[i] && result_d.dec_idx == 2) || (rsv[i] && result_d.dec_idx == 1)) {
+        } else if ((lsv[i] && dec_sel == 2) || (rsv[i] && dec_sel == 1)) {
+            dec_sel = 0;
             result_d.dec_idx = i;
             break;
         }
+    }
+    if (dec_sel != 0) {
+        result_d.dec_idx = bufsize - 1;
     }
     char resi_locked = 0;
     size_t resd_il;
@@ -301,6 +306,8 @@ void fbigdiv(arrayfloat_t lsv_d, arrayfloat_t rsv_d) {
                 }
                 result_d.dec_idx += bufsize_prev;
             } else {
+                result_d.dec_idx--;
+                result_d.flength++;
                 break;
             }
         }
